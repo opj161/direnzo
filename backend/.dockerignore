@@ -1,0 +1,22 @@
+# Git files
+.git
+.gitignore
+
+# Node modules (will be installed in the container)
+node_modules
+
+# Environment variables file (should be injected, not copied)
+.env
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Local Uploads (should not be copied into image, use volume mount)
+uploads/

@@ -30,6 +30,7 @@ function App() {
   const [galleryImageRelativePaths, setGalleryImageRelativePaths] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null); // State for the prompt
 
   // --- Load Gallery from localStorage on initial mount ---
   useEffect(() => {
@@ -82,6 +83,7 @@ function App() {
     setIsLoading(true);
     setErrorMessage(null);
     setGeneratedImageRelativePath(null); // Clear previous image while generating
+    setGeneratedPrompt(null); // Clear previous prompt
 
     const payload = {
       settings: { modelSettings, environmentSettings },
@@ -92,13 +94,14 @@ function App() {
 
     // --- API Interaction (Item 3.97) ---
     try {
-      // Call the actual API service - it returns the relative path
-      const imageRelativePath = await generateImage(payload);
+      // Call the API service - it now returns an object { imageUrl, promptUsed }
+      const { imageUrl: imageRelativePath, promptUsed } = await generateImage(payload);
       console.log("API Success. Image Relative Path:", imageRelativePath);
+      console.log("API Success. Prompt Used:", promptUsed); // Log the received prompt
       setGeneratedImageRelativePath(imageRelativePath); // Store the relative path
+      setGeneratedPrompt(promptUsed); // Store the prompt
 
-      // --- Update Gallery & localStorage (Item 3.101-3.104) ---
-      // --- Update Gallery & localStorage (Item 3.101-3.104) ---
+      // --- Update Gallery & localStorage ---
       // Store relative paths in state and localStorage
       setGalleryImageRelativePaths(prevPaths => {
         const newPaths = [imageRelativePath, ...prevPaths].slice(0, MAX_GALLERY_ITEMS); // Add relative path
@@ -106,10 +109,9 @@ function App() {
           localStorage.setItem(GALLERY_STORAGE_KEY, JSON.stringify(newPaths)); // Save relative paths
         } catch (storageError) {
           console.error("Failed to save gallery to localStorage:", storageError);
-          // Display a non-blocking error message if localStorage fails
           setErrorMessage("Generated image displayed, but failed to save to local gallery.");
         }
-        return newPaths; // Fix: Use the correct variable name
+        return newPaths;
       });
 
     } catch (error) {
@@ -133,10 +135,12 @@ function App() {
         const urlObject = new URL(url);
         const relativePath = urlObject.pathname; // Extracts path like /images/uuid.jpg
         setGeneratedImageRelativePath(relativePath); // Set the relative path state
+        setGeneratedPrompt(null); // Clear prompt when selecting from gallery (it wasn't saved with gallery items)
     } catch (e) {
         console.error("Invalid URL clicked in gallery:", url, e);
         setErrorMessage("Could not display the selected gallery image.");
         setGeneratedImageRelativePath(null);
+        setGeneratedPrompt(null);
     }
     setErrorMessage(null); // Clear any previous errors
   }, []);
@@ -157,13 +161,14 @@ function App() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-grow container mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Use more columns for finer control, adjust gap */}
+      <main className="flex-grow container mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6">
 
-        {/* Settings Panel (Left Column) */}
-        <section className="md:col-span-1 bg-white p-4 rounded shadow flex flex-col space-y-4">
+        {/* Settings Panel (Left Column - takes 3/12) */}
+        <section className="md:col-span-3 bg-white p-4 rounded shadow flex flex-col space-y-4">
           <h2 className="text-xl font-semibold mb-2 border-b pb-2">Settings</h2>
+          {/* Keep ImageUploader here for input, but its preview won't be the main display */}
           <ImageUploader onImageUpload={handleImageUpload} />
-          {/* Conditionally render settings once callbacks are ready */}
           {handleModelSettingsChange && <ModelSettings onChange={handleModelSettingsChange} />}
           {handleEnvironmentSettingsChange && <EnvironmentSettings onChange={handleEnvironmentSettingsChange} />}
           <div className="mt-auto pt-4"> {/* Push button to bottom */}
@@ -175,18 +180,53 @@ function App() {
           </div>
         </section>
 
-        {/* Main Image Display (Center Column) */}
-        <section className="md:col-span-2 bg-white p-4 rounded shadow flex flex-col relative"> {/* Added relative positioning for LoadingIndicator */}
-          <h2 className="text-xl font-semibold mb-4 border-b pb-2 w-full">Generated Image</h2>
-          <div className="flex-grow flex items-center justify-center text-gray-500 relative min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
-             {/* Loading Indicator overlays the image viewer area */}
-            <LoadingIndicator isActive={isLoading} />
-            {/* Construct full URL for ImageViewer */}
-            <ImageViewer imageUrl={generatedImageRelativePath ? `${API_BASE_URL}${generatedImageRelativePath}` : null} isLoading={isLoading} />
-          </div>
-           {/* Error Message below the image viewer */}
-          <ErrorMessage message={errorMessage} onDismiss={handleDismissError} />
-        </section>
+        {/* Comparison Area (Center/Right Columns - takes 9/12) */}
+        <section className="md:col-span-9 bg-white p-4 rounded shadow flex flex-col">
+            <h2 className="text-xl font-semibold mb-4 border-b pb-2 w-full">Comparison</h2>
+            {/* Grid for side-by-side images */}
+            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 relative min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
+
+              {/* Original Image Area */}
+              <div className="border rounded p-2 flex flex-col items-center justify-center bg-gray-50">
+                 <h3 className="text-lg font-medium text-gray-700 mb-2">Original</h3>
+                 <div className="flex-grow w-full flex items-center justify-center overflow-hidden p-1">
+                   {uploadedImageData ? (
+                     <img src={uploadedImageData} alt="Original Upload" className="max-w-full max-h-full object-contain rounded shadow-sm"/>
+                   ) : (
+                     <p className="text-gray-400 text-center px-4">Upload an image using the panel on the left.</p>
+                   )}
+                 </div>
+              </div>
+
+              {/* Generated Image Area & Prompt */}
+              <div className="border rounded p-2 flex flex-col items-center justify-start bg-gray-50 relative">
+                 <h3 className="text-lg font-medium text-gray-700 mb-2">Generated</h3>
+                 {/* Image container */}
+                 <div className="relative w-full flex-grow flex items-center justify-center overflow-hidden p-1 min-h-[250px]">
+                    <LoadingIndicator isActive={isLoading} /> {/* Overlay */}
+                    <ImageViewer imageUrl={generatedImageRelativePath ? `${API_BASE_URL}${generatedImageRelativePath}` : null} isLoading={isLoading} />
+                 </div>
+                 {/* Prompt Display Area - Conditionally render below image */}
+                 {generatedPrompt && !isLoading && generatedImageRelativePath && (
+                    <div className="w-full mt-3 pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-600 mb-1 px-1">Prompt Used:</h4>
+                        <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto whitespace-pre-wrap break-words font-mono">
+                            {generatedPrompt}
+                        </pre>
+                    </div>
+                 )}
+                 {!generatedPrompt && !isLoading && !generatedImageRelativePath && !uploadedImageData && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <p className="text-gray-400 text-center px-4">Generated image and prompt will appear here.</p>
+                    </div>
+                 )}
+              </div>
+            </div>
+             {/* Error Message below the comparison area */}
+            <div className="mt-4">
+                <ErrorMessage message={errorMessage} onDismiss={handleDismissError} />
+            </div>
+          </section>
 
       </main>
 

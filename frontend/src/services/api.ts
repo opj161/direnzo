@@ -14,6 +14,7 @@ interface GenerateApiPayload {
 interface GenerateApiSuccessResponse {
   success: true;
   imageUrl: string;
+  promptUsed: string; // Add prompt field
 }
 
 // Define the expected structure of a failed backend response
@@ -26,7 +27,8 @@ interface GenerateApiErrorResponse {
 function isSuccessResponse(response: unknown): response is GenerateApiSuccessResponse {
     return typeof response === 'object' && response !== null &&
            'success' in response && response.success === true &&
-           'imageUrl' in response && typeof response.imageUrl === 'string';
+           'imageUrl' in response && typeof response.imageUrl === 'string' &&
+           'promptUsed' in response && typeof response.promptUsed === 'string'; // Check for prompt field
 }
 
 // Type guard to check for error response
@@ -47,7 +49,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
  * @returns The URL of the generated image.
  * @throws An error with a message if the API call fails or returns an error.
  */
-export const generateImage = async (payload: GenerateApiPayload): Promise<string> => {
+export const generateImage = async (payload: GenerateApiPayload): Promise<{ imageUrl: string, promptUsed: string }> => {
   const apiUrl = `${API_BASE_URL}/generate`;
   console.log(`Sending request to: ${apiUrl}`);
 
@@ -81,7 +83,8 @@ export const generateImage = async (payload: GenerateApiPayload): Promise<string
 
     // Validate the success response structure
     if (isSuccessResponse(data)) {
-      return data.imageUrl;
+      // Return the object containing both URL and prompt
+      return { imageUrl: data.imageUrl, promptUsed: data.promptUsed };
     } else {
       // Handle cases where the status code was ok, but the body is unexpected
       console.error("Unexpected successful response format:", data);

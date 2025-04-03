@@ -281,7 +281,7 @@ app.post('/generate', async (req, res) => {
 
         // --- 5c. Return Success Response (Remains the same) ---
         console.log(`Sending success response with relative URL: ${imageUrlRelative}`);
-        res.status(200).json({ success: true, imageUrl: imageUrlRelative });
+        res.status(200).json({ success: true, imageUrl: imageUrlRelative, promptUsed: textPrompt });
 
     } else {
         // --- Handle case where NO image was generated (Remains the same logic) ---

@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
 
 // Define options based on PRD (Section 3.3)
-const BACKGROUND_PRESET_OPTIONS = [
-  'Simple White Studio',
-  'Simple Grey Studio',
-  'Outdoor - City Street',
-  'Outdoor - Beach Sunset',
-  'Outdoor - Park (Daylight)',
-  'Abstract Gradient',
-];
+// Define mapping from display name to backend key
+const BACKGROUND_PRESET_MAP: { [key: string]: string } = {
+  'Studio - White': 'studio-white',
+  'Studio - Gradient': 'studio-gradient',
+  'In Store': 'in-store',
+  'Lifestyle - Home': 'lifestyle-home',
+  'Lifestyle - Office': 'lifestyle-office',
+  'Outdoor - Urban': 'outdoor-urban',
+  'Outdoor - Nature': 'outdoor-nature',
+  'Seasonal - Spring': 'seasonal-spring',
+  'Seasonal - Summer': 'seasonal-summer',
+  'Seasonal - Fall': 'seasonal-fall',
+  'Seasonal - Winter': 'seasonal-winter',
+  // Add other mappings if needed, ensure keys match backend server.js
+};
+// Derive options from the map keys for the dropdown display
+const BACKGROUND_PRESET_OPTIONS = Object.keys(BACKGROUND_PRESET_MAP);
 const LIGHTING_OPTIONS = [
   'Studio Softbox',
   'Natural Daylight',
@@ -39,7 +48,8 @@ interface EnvironmentSettingsProps {
 const EnvironmentSettings: React.FC<EnvironmentSettingsProps> = ({ onChange }) => {
   // Initialize state with default values
   const [settings, setSettings] = useState<EnvironmentSettingsState>({
-    backgroundPreset: BACKGROUND_PRESET_OPTIONS[0], // Default to first preset
+    // Default to the KEY of the first option in the map
+    backgroundPreset: BACKGROUND_PRESET_MAP[BACKGROUND_PRESET_OPTIONS[0]] || '',
     backgroundCustom: '',
     lighting: LIGHTING_OPTIONS[0],
     lensStyle: LENS_STYLE_OPTIONS[0],
@@ -57,21 +67,26 @@ const EnvironmentSettings: React.FC<EnvironmentSettingsProps> = ({ onChange }) =
     const { name, value } = event.target;
 
     setSettings(prevSettings => {
-      const newSettings = { ...prevSettings, [name]: value };
+        const newSettings = { ...prevSettings };
 
-      // Logic for mutual exclusivity of background preset/custom
-      if (name === 'backgroundPreset' && value !== '') {
-        // If a preset is selected, clear custom input
-        newSettings.backgroundCustom = '';
-      } else if (name === 'backgroundCustom' && value !== '') {
-        // If custom text is entered, clear preset selection (e.g., add a "Custom" option or handle internally)
-        // For simplicity here, we might just let the backend prioritize custom if present.
-        // Or, add a "Select Preset..." option to the dropdown to represent 'none selected'.
-        // Let's assume backend prioritizes custom for now. If preset dropdown needs explicit clearing,
-        // we'd need to add a placeholder option like "" or "Custom".
-      }
-
-      return newSettings;
+        if (name === 'backgroundPreset') {
+            // Directly store the selected key from the dropdown value
+            newSettings.backgroundPreset = value;
+            if (value !== '') {
+                // Clear custom input if a preset key is selected
+                newSettings.backgroundCustom = '';
+            }
+        } else if (name === 'backgroundCustom') {
+            newSettings.backgroundCustom = value;
+            if (value !== '') {
+                // Clear preset key if custom text is entered
+                newSettings.backgroundPreset = '';
+            }
+        } else {
+            // Handle other fields (lighting, lensStyle)
+            newSettings[name as keyof EnvironmentSettingsState] = value;
+        }
+        return newSettings;
     });
   };
 
@@ -94,12 +109,24 @@ const EnvironmentSettings: React.FC<EnvironmentSettingsProps> = ({ onChange }) =
         onChange={handleChange}
         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
       >
-        {/* {placeholder && <option value="">{placeholder}</option>} */}
-        {options.map(option => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {/* Add a placeholder option */}
+        {name === 'backgroundPreset' ? (
+           <>
+             <option value="">-- Select Preset --</option>
+             {BACKGROUND_PRESET_OPTIONS.map(displayName => (
+               <option key={displayName} value={BACKGROUND_PRESET_MAP[displayName]}> {/* Value is the KEY */}
+                 {displayName} {/* Text is the display name */}
+               </option>
+             ))}
+           </>
+        ) : (
+           // Original options for other selects (lighting, lensStyle)
+           options.map(option => (
+             <option key={option} value={option}>
+               {option}
+             </option>
+           ))
+        )}
       </select>
     </div>
   );

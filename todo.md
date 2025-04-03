@@ -44,7 +44,7 @@ This checklist outlines the steps to build Version 1 of the AI Fashion Image Gen
 
 *   [ ] **Basic Server Setup:**
     *   [ ] Initialize Node.js project (`npm init`).
-    *   [ ] Install core dependencies: `express`, `dotenv`, `@google/generative-ai`, `cors`, `uuid` (for unique filenames). (Removed GCS/Firestore libs). Add `fs-extra` for potentially easier file operations (optional).
+    *   [ ] Install core dependencies: `express`, `dotenv`, `@google/genai`, `cors`, `uuid` (for unique filenames). (Removed GCS/Firestore libs, updated Gemini SDK). Add `fs-extra` for potentially easier file operations (optional).
     *   [ ] Create basic Express server structure (`server.js` or `index.js`).
     *   [ ] Set up environment variable handling (using `dotenv` locally).
     *   [ ] Implement basic CORS configuration (`cors` middleware).
@@ -52,7 +52,7 @@ This checklist outlines the steps to build Version 1 of the AI Fashion Image Gen
     *   [ ] Define the `POST /generate` route in Express.
     *   [ ] Implement logic to receive request body (expecting JSON with settings and base64 image data). Add basic validation.
 *   [ ] **Gemini Integration:**
-    *   [ ] Implement Gemini API client initialization using `@google/generative-ai` and the API key from environment variables.
+    *   [ ] Implement Gemini API client initialization using `@google/genai` and the API key from environment variables.
     *   [ ] Implement logic to construct the multimodal prompt: combine text prompt derived from settings + image data (decode base64).
     *   [ ] Implement the call to `gemini-2.0-flash-exp` model's `generateContent` method with the multimodal payload.
     *   [ ] Handle the Gemini API response: extract the generated image data (likely base64).

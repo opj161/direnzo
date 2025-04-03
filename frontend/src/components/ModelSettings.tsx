@@ -11,7 +11,7 @@ const ETHNICITY_OPTIONS = [
   'South Asian',
   'Hispanic/Latino',
   'Middle Eastern',
-  'Ambiguous/Mixed',
+  'Mixed-race',
 ];
 
 // Interface for the component's state

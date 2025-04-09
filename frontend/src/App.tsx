@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
 // Import Components
-import ImageUploader from './components/ImageUploader';
+// ImageUploader component is no longer needed
 import ModelSettings, { ModelSettingsState } from './components/ModelSettings';
 import EnvironmentSettings, { EnvironmentSettingsState } from './components/EnvironmentSettings';
 import GenerationButton from './components/GenerationButton';
@@ -19,6 +19,12 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 const GALLERY_STORAGE_KEY = 'aiFashionGallery_v1';
 const MAX_GALLERY_ITEMS = 20; // As per PRD
 
+// --- Upload Constants ---
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ACCEPTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
+const ACCEPTED_FORMATS_STRING = ACCEPTED_FORMATS.join(',');
+
 function App() {
   // --- State Management ---
   const [uploadedImageData, setUploadedImageData] = useState<string | null>(null);
@@ -31,6 +37,9 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null); // State for the prompt
+  // --- Upload State (moved from ImageUploader) ---
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // --- Load Gallery from localStorage on initial mount ---
   useEffect(() => {
@@ -61,9 +70,11 @@ function App() {
   // --- Callback Handlers ---
   const handleImageUpload = useCallback((imageData: string | null) => {
     setUploadedImageData(imageData);
-    setErrorMessage(null); // Clear error on new upload
-    // Optionally clear generated image view if a new image is uploaded
-     setGeneratedImageRelativePath(null);
+    setErrorMessage(null); // Clear generation error on new upload
+    setUploadError(null); // Clear upload error on new upload
+    // Clear generated image view and prompt if a new image is uploaded
+    setGeneratedImageRelativePath(null);
+    setGeneratedPrompt(null);
   }, []);
 
   const handleModelSettingsChange = useCallback((settings: ModelSettingsState) => {
@@ -147,28 +158,107 @@ function App() {
 
   const handleDismissError = useCallback(() => {
     setErrorMessage(null);
+    setUploadError(null); // Also clear upload error
   }, []);
+
+  // --- Upload Logic (moved from ImageUploader) ---
+  const processFile = useCallback((file: File | null) => {
+    setUploadError(null); // Clear previous errors
+
+    if (!file) {
+        handleImageUpload(null); // Clear image data in parent if file is null
+        return;
+    }
+
+    // Validate file type
+    if (!ACCEPTED_FORMATS.includes(file.type)) {
+      setUploadError(`Invalid format. Use ${ACCEPTED_FORMATS.map(f => f.split('/')[1]).join(', ')}.`);
+      handleImageUpload(null);
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadError(`File too large. Max ${MAX_FILE_SIZE_MB}MB.`);
+      handleImageUpload(null);
+      return;
+    }
+
+    // Read file as Data URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      handleImageUpload(base64String); // Pass base64 data up
+      setUploadError(null); // Clear error on success
+    };
+    reader.onerror = () => {
+      setUploadError('Failed to read file.');
+      handleImageUpload(null);
+    };
+    reader.readAsDataURL(file);
+  }, [handleImageUpload]); // Include handleImageUpload dependency
+
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    processFile(file || null);
+    // Reset input value to allow uploading the same file again
+    event.target.value = '';
+  }, [processFile]);
+
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only set dragging to false if leaving the actual drop zone, not its children
+    if (event.currentTarget.contains(event.relatedTarget as Node)) {
+        return;
+    }
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    processFile(file || null);
+  }, [processFile]);
+
+  const handleClearUpload = useCallback(() => {
+    processFile(null); // This calls handleImageUpload(null) and clears errors
+    // No need to clear generated image/prompt here, handleImageUpload already does it
+    // Ensure the hidden file input is cleared if needed, though processFile(null) should suffice
+    const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+    if (fileInput) {
+        fileInput.value = '';
+    }
+  }, [processFile]);
+  // --- End Upload Logic ---
 
   // Determine if generate button should be disabled
   const isGenerateDisabled = !uploadedImageData || isLoading;
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 flex flex-col">
-      {/* Header (Optional) */}
-      <header className="bg-white shadow-md p-4">
+      {/* Header */}
+      <header className="bg-white shadow-md p-4 sticky top-0 z-10">
         <h1 className="text-2xl font-bold text-center text-blue-600">
           AI Fashion Image Generator (V1)
         </h1>
       </header>
 
       {/* Main Content Area */}
-      {/* Use more columns for finer control, adjust gap */}
-      <main className="flex-grow container mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6">
+      <main className="flex-grow p-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-12 gap-6"> {/* Removed container mx-auto, added padding */}
 
         {/* Settings Panel (Left Column - takes 3/12) */}
-        <section className="md:col-span-3 bg-white p-4 rounded shadow flex flex-col space-y-4">
+        <section className="md:col-span-3 lg:max-w-sm bg-white p-4 rounded shadow flex flex-col space-y-4 self-start md:sticky top-[calc(4rem+1rem)]"> {/* Added lg:max-w-sm */}
           <h2 className="text-xl font-semibold mb-2 border-b pb-2">Settings</h2>
-          {/* Keep ImageUploader here for input, but its preview won't be the main display */}
-          <ImageUploader onImageUpload={handleImageUpload} />
+          {/* ImageUploader component is fully removed */}
           {handleModelSettingsChange && <ModelSettings onChange={handleModelSettingsChange} />}
           {handleEnvironmentSettingsChange && <EnvironmentSettings onChange={handleEnvironmentSettingsChange} />}
           <div className="mt-auto pt-4"> {/* Push button to bottom */}
@@ -184,45 +274,87 @@ function App() {
         <section className="md:col-span-9 bg-white p-4 rounded shadow flex flex-col">
             <h2 className="text-xl font-semibold mb-4 border-b pb-2 w-full">Comparison</h2>
             {/* Grid for side-by-side images */}
-            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 relative min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
+            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 relative min-h-[400px] lg:min-h-[500px]"> {/* flex-grow was already here, ensure parent section has flex-col */}
 
-              {/* Original Image Area */}
-              <div className="border rounded p-2 flex flex-col items-center justify-center bg-gray-50">
-                 <h3 className="text-lg font-medium text-gray-700 mb-2">Original</h3>
-                 <div className="flex-grow w-full flex items-center justify-center overflow-hidden p-1">
+              {/* Original Image Area (Now includes Upload) */}
+              <div className="border border-gray-200 rounded p-4 flex flex-col items-center justify-center bg-gray-50 relative group min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[500px]"> {/* Increased padding, explicit border color */}
+                 <h3 className="text-lg font-semibold text-gray-800 mb-3 w-full text-center">Original</h3> {/* Removed absolute, centered, added margin, bolder */}
+                 {/* Hidden File Input */}
+                 <input
+                    id="fileInput"
+                    type="file"
+                    accept={ACCEPTED_FORMATS_STRING}
+                    onChange={handleFileChange}
+                    className="hidden"
+                 />
+                 {/* Drop Zone / Display Area - Takes full space */}
+                 {/* This div now needs flex-grow to fill the parent's flex container */}
+                 <div
+                    className={`absolute inset-0 flex items-center justify-center overflow-hidden p-1 rounded-md cursor-pointer border-2 border-dashed flex-grow
+                                ${isDragging ? 'border-blue-500 bg-blue-100' : 'border-gray-300 hover:border-gray-400'}
+                                ${uploadedImageData ? 'border-transparent hover:border-gray-400' : ''} // Make border transparent when image shown, reappear on hover
+                                transition-all duration-200 ease-in-out`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => !uploadedImageData && document.getElementById('fileInput')?.click()} // Only allow click to upload if no image
+                 >
                    {uploadedImageData ? (
                      <img src={uploadedImageData} alt="Original Upload" className="max-w-full max-h-full object-contain rounded shadow-sm"/>
                    ) : (
-                     <p className="text-gray-400 text-center px-4">Upload an image using the panel on the left.</p>
+                     <div className="text-center text-gray-500 p-4">
+                        {/* Upload Icon */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <p className="font-semibold">{isDragging ? 'Drop image here' : 'Click or drag & drop image'}</p>
+                        <p className="text-xs mt-1">({ACCEPTED_FORMATS.map(f => f.split('/')[1].toUpperCase()).join(', ')} up to {MAX_FILE_SIZE_MB}MB)</p>
+                     </div>
                    )}
                  </div>
+                 {/* Clear/Replace Button - More prominent, centered on hover */}
+                 {uploadedImageData && (
+                    <button
+                        onClick={handleClearUpload}
+                        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-15 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md" // Further reduced bg-opacity-25 to bg-opacity-15
+                        aria-label="Clear or replace uploaded image"
+                    >
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                         </svg>
+                         Clear/Replace
+                    </button>
+                 )}
+                 {/* Upload Error Display - Positioned at the bottom */}
+                 {uploadError && (
+                    <div className="absolute bottom-2 left-2 right-2 p-1 bg-red-100 border border-red-400 text-red-700 text-xs rounded text-center">
+                        {uploadError}
+                    </div>
+                  )}
               </div>
 
               {/* Generated Image Area & Prompt */}
-              <div className="border rounded p-2 flex flex-col items-center justify-start bg-gray-50 relative">
-                 <h3 className="text-lg font-medium text-gray-700 mb-2">Generated</h3>
+              <div className="border border-gray-200 rounded p-4 flex flex-col items-center justify-start bg-gray-50 relative h-full"> {/* Removed min-h, added h-full */}
+                 <h3 className="text-lg font-semibold text-gray-800 mb-3 w-full text-center">Generated</h3> {/* Removed absolute, centered, added margin, bolder */}
                  {/* Image container */}
-                 <div className="relative w-full flex-grow flex items-center justify-center overflow-hidden p-1 min-h-[250px]">
+                 <div className="relative w-full flex-grow flex items-center justify-center overflow-hidden p-1"> {/* flex-grow is already here */}
                     <LoadingIndicator isActive={isLoading} /> {/* Overlay */}
+                    {/* ImageViewer handles its own placeholder */}
                     <ImageViewer imageUrl={generatedImageRelativePath ? `${API_BASE_URL}${generatedImageRelativePath}` : null} isLoading={isLoading} />
                  </div>
                  {/* Prompt Display Area - Conditionally render below image */}
                  {generatedPrompt && !isLoading && generatedImageRelativePath && (
                     <div className="w-full mt-3 pt-3 border-t border-gray-200">
                         <h4 className="text-sm font-medium text-gray-600 mb-1 px-1">Prompt Used:</h4>
-                        <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto whitespace-pre-wrap break-words font-mono">
+                        <pre className="text-xs bg-white p-2 rounded overflow-x-auto whitespace-pre-wrap break-words font-mono border border-gray-200"> {/* Changed bg-gray-100 to bg-white and added border */}
                             {generatedPrompt}
                         </pre>
                     </div>
                  )}
-                 {!generatedPrompt && !isLoading && !generatedImageRelativePath && !uploadedImageData && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400 text-center px-4">Generated image and prompt will appear here.</p>
-                    </div>
-                 )}
+                 {/* Placeholder logic is now handled entirely by ImageViewer */}
               </div>
             </div>
-             {/* Error Message below the comparison area */}
+             {/* Generation Error Message below the comparison area */}
             <div className="mt-4">
                 <ErrorMessage message={errorMessage} onDismiss={handleDismissError} />
             </div>
@@ -230,18 +362,18 @@ function App() {
 
       </main>
 
-      {/* Gallery Section (Below Main Content) */}
-      <section className="container mx-auto p-4 mt-4 bg-white rounded shadow">
+      {/* Gallery Section */}
+      <section className="p-4 sm:px-6 lg:px-8 mt-4 bg-white rounded shadow"> {/* Removed container mx-auto, added padding */}
          <h2 className="text-xl font-semibold mb-2 border-b pb-2">Recent Generations</h2>
-         {/* Construct full URLs for Gallery thumbnails */}
          <Gallery
             imageUrls={galleryImageRelativePaths.map(relPath => `${API_BASE_URL}${relPath}`)}
             onThumbnailClick={handleThumbnailClick}
          />
       </section>
 
-      {/* Footer (Optional) */}
-      <footer className="text-center p-4 mt-4 text-sm text-gray-500">
+      {/* Footer */}
+      {/* Added padding to footer to align with main content */}
+      <footer className="text-center p-4 sm:px-6 lg:px-8 mt-4 text-sm text-gray-500">
         Fashion AI V1
       </footer>
     </div>

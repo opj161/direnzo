@@ -31,3 +31,4 @@ Thumbs.db
 
 # Local Uploads (Backend)
 backend/uploads/
+.aider*

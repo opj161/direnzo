@@ -244,7 +244,7 @@ function App() {
   const isGenerateDisabled = !uploadedImageData || isLoading;
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-white text-gray-900 flex flex-col">
       {/* Header */}
       <header className="bg-white shadow-md p-4 sticky top-0 z-10">
         <h1 className="text-2xl font-bold text-center text-blue-600">
@@ -257,7 +257,7 @@ function App() {
 
         {/* Settings Panel (Left Column - takes 3/12) */}
         <section className="md:col-span-3 lg:max-w-sm bg-white p-4 rounded shadow flex flex-col space-y-4 self-start md:sticky top-[calc(4rem+1rem)]"> {/* Added lg:max-w-sm */}
-          <h2 className="text-xl font-semibold mb-2 border-b pb-2">Settings</h2>
+          <h2 className="text-xl font-semibold mb-3 border-b pb-2">Settings</h2>
           {/* ImageUploader component is fully removed */}
           {handleModelSettingsChange && <ModelSettings onChange={handleModelSettingsChange} />}
           {handleEnvironmentSettingsChange && <EnvironmentSettings onChange={handleEnvironmentSettingsChange} />}
@@ -272,7 +272,7 @@ function App() {
 
         {/* Comparison Area (Center/Right Columns - takes 9/12) */}
         <section className="md:col-span-9 bg-white p-4 rounded shadow flex flex-col">
-            <h2 className="text-xl font-semibold mb-4 border-b pb-2 w-full">Comparison</h2>
+            <h2 className="text-xl font-semibold mb-3 border-b pb-2 w-full">Comparison</h2>
             {/* Grid for side-by-side images */}
             <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 relative min-h-[400px] lg:min-h-[500px]"> {/* flex-grow was already here, ensure parent section has flex-col */}
 
@@ -291,7 +291,7 @@ function App() {
                  {/* This div now needs flex-grow to fill the parent's flex container */}
                  <div
                     className={`absolute inset-0 flex items-center justify-center overflow-hidden p-1 rounded-md cursor-pointer border-2 border-dashed flex-grow
-                                ${isDragging ? 'border-blue-500 bg-blue-100' : 'border-gray-300 hover:border-gray-400'}
+                                ${isDragging ? 'border-blue-500 bg-blue-100' : 'border-gray-200 hover:border-gray-400'} {/* Lighter border */}
                                 ${uploadedImageData ? 'border-transparent hover:border-gray-400' : ''} // Make border transparent when image shown, reappear on hover
                                 transition-all duration-200 ease-in-out`}
                     onDragOver={handleDragOver}
@@ -316,13 +316,13 @@ function App() {
                  {uploadedImageData && (
                     <button
                         onClick={handleClearUpload}
-                        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-15 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md" // Further reduced bg-opacity-25 to bg-opacity-15
-                        aria-label="Clear or replace uploaded image"
+                        className="absolute top-2 right-2 z-10 p-1.5 bg-black bg-opacity-30 hover:bg-opacity-50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        aria-label="Clear uploaded image"
                     >
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                         {/* Using a smaller trash icon */}
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                          </svg>
-                         Clear/Replace
                     </button>
                  )}
                  {/* Upload Error Display - Positioned at the bottom */}
@@ -364,7 +364,7 @@ function App() {
 
       {/* Gallery Section */}
       <section className="p-4 sm:px-6 lg:px-8 mt-4 bg-white rounded shadow"> {/* Removed container mx-auto, added padding */}
-         <h2 className="text-xl font-semibold mb-2 border-b pb-2">Recent Generations</h2>
+         <h2 className="text-xl font-semibold mb-3 border-b pb-2">Recent Generations</h2>
          <Gallery
             imageUrls={galleryImageRelativePaths.map(relPath => `${API_BASE_URL}${relPath}`)}
             onThumbnailClick={handleThumbnailClick}

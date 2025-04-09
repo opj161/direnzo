@@ -102,32 +102,44 @@ const EnvironmentSettings: React.FC<EnvironmentSettingsProps> = ({ onChange }) =
       <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
         {label}
       </label>
-      <select
-        id={name}
-        name={name}
-        value={settings[name]}
-        onChange={handleChange}
-        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
-      >
-        {/* Add a placeholder option */}
-        {name === 'backgroundPreset' ? (
-           <>
-             <option value="">-- Select Preset --</option>
-             {BACKGROUND_PRESET_OPTIONS.map(displayName => (
-               <option key={displayName} value={BACKGROUND_PRESET_MAP[displayName]}> {/* Value is the KEY */}
-                 {displayName} {/* Text is the display name */}
+      {/* Added relative positioning to the wrapper */}
+      <div className="relative mt-1">
+        <select
+          id={name}
+          name={name}
+          value={settings[name]}
+          onChange={handleChange}
+          // Add disabled state for backgroundPreset select
+          disabled={name === 'backgroundPreset' && settings.backgroundCustom !== ''}
+          // Updated classes for consistent styling and custom arrow
+          className={`appearance-none block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${name === 'backgroundPreset' && settings.backgroundCustom !== '' ? 'disabled:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed' : ''}`}
+        >
+          {/* Add a placeholder option */}
+          {name === 'backgroundPreset' ? (
+             <>
+               <option value="">-- Select Preset --</option>
+               {BACKGROUND_PRESET_OPTIONS.map(displayName => (
+                 <option key={displayName} value={BACKGROUND_PRESET_MAP[displayName]}> {/* Value is the KEY */}
+                   {displayName} {/* Text is the display name */}
+                 </option>
+               ))}
+             </>
+          ) : (
+             // Original options for other selects (lighting, lensStyle)
+             options.map(option => (
+               <option key={option} value={option}>
+                 {option}
                </option>
-             ))}
-           </>
-        ) : (
-           // Original options for other selects (lighting, lensStyle)
-           options.map(option => (
-             <option key={option} value={option}>
-               {option}
-             </option>
-           ))
-        )}
-      </select>
+             ))
+          )}
+        </select>
+        {/* Custom dropdown arrow */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+          </svg>
+        </div>
+      </div>
     </div>
   );
 
@@ -137,18 +149,10 @@ const EnvironmentSettings: React.FC<EnvironmentSettingsProps> = ({ onChange }) =
 
       {/* Background Settings */}
       <div className="mb-3 p-3 border border-gray-200 rounded">
-        <p className="text-sm font-medium text-gray-700 mb-2">Background (Choose One)</p>
+        <p className="text-sm font-medium text-gray-700 mb-2">Background</p>
         {renderSelect('backgroundPreset', 'Preset', BACKGROUND_PRESET_OPTIONS)}
 
-        <div className="relative my-2">
-          <div className="absolute inset-0 flex items-center" aria-hidden="true">
-            <div className="w-full border-t border-gray-300" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-white px-2 text-sm text-gray-500">OR</span>
-          </div>
-        </div>
-
+        {/* "OR" divider removed */}
         <div>
           <label htmlFor="backgroundCustom" className="block text-sm font-medium text-gray-700 mb-1">
             Custom Description
@@ -160,9 +164,10 @@ const EnvironmentSettings: React.FC<EnvironmentSettingsProps> = ({ onChange }) =
             value={settings.backgroundCustom}
             onChange={handleChange}
             placeholder="e.g., 'Minimalist loft apartment'"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            // Disable if a preset is actively selected (optional UX enhancement)
-            // disabled={settings.backgroundPreset !== ''}
+            // Ensured consistent styling with selects
+            className={`block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${settings.backgroundPreset !== '' ? 'disabled:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed' : ''}`}
+            // Disable if a preset is actively selected
+            disabled={settings.backgroundPreset !== ''}
           />
            <p className="text-xs text-gray-500 mt-1">If filled, this overrides the preset.</p>
         </div>

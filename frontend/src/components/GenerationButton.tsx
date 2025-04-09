@@ -16,7 +16,7 @@ const GenerationButton: React.FC<GenerationButtonProps> = ({ onClick, isLoading,
       disabled={disabled}
       className={`w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white 
                   ${disabled
-                    ? 'bg-gray-400 cursor-not-allowed'
+                    ? 'bg-indigo-300 cursor-not-allowed' // Updated disabled background
                     : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                   } 
                   transition ease-in-out duration-150`}

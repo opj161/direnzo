@@ -7,7 +7,7 @@ interface ImageViewerProps {
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, isLoading }) => {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-200 rounded min-h-[300px] md:min-h-[400px] lg:min-h-[500px] overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded min-h-[300px] md:min-h-[400px] lg:min-h-[500px] overflow-hidden"> {/* Updated background */}
       {isLoading && !imageUrl && (
          // This state is tricky - usually covered by the main loading indicator.
          // We might just show the placeholder until the image URL is ready.

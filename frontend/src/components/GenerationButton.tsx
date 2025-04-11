@@ -14,12 +14,12 @@ const GenerationButton: React.FC<GenerationButtonProps> = ({ onClick, isLoading,
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white 
+      className={`w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white
                   ${disabled
-                    ? 'bg-indigo-300 cursor-not-allowed' // Updated disabled background
-                    : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                  } 
-                  transition ease-in-out duration-150`}
+                    ? 'bg-primary-300 dark:bg-primary-800 cursor-not-allowed'
+                    : 'bg-primary-600 hover:bg-primary-700 dark:bg-primary-700 dark:hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-primary-400 dark:focus:ring-offset-gray-800'
+                  }
+                  transition-all duration-200`}
     >
       {isLoading ? (
         <>

@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 
 // Import Components
-// ImageUploader component is no longer needed
 import ModelSettings, { ModelSettingsState } from './components/ModelSettings';
 import EnvironmentSettings, { EnvironmentSettingsState } from './components/EnvironmentSettings';
 import GenerationButton from './components/GenerationButton';
@@ -9,7 +8,9 @@ import ImageViewer from './components/ImageViewer';
 import Gallery from './components/Gallery';
 import LoadingIndicator from './components/LoadingIndicator';
 import ErrorMessage from './components/ErrorMessage';
+import ThemeToggle from './components/ThemeToggle';
 import { generateImage } from './services/api';
+import { initializeTheme } from './utils/themeUtils';
 
 // Get the backend URL from environment variables (Vite specific)
 // Fallback to localhost for local development
@@ -40,6 +41,13 @@ function App() {
   // --- Upload State (moved from ImageUploader) ---
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // --- Responsive UI State ---
+  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState<boolean>(false);
+
+  // Initialize theme on component mount
+  useEffect(() => {
+    initializeTheme();
+  }, []);
 
   // --- Load Gallery from localStorage on initial mount ---
   useEffect(() => {
@@ -161,6 +169,16 @@ function App() {
     setUploadError(null); // Also clear upload error
   }, []);
 
+  const toggleSettingsPanel = useCallback(() => {
+    setIsSettingsPanelOpen(prev => !prev);
+  }, []);
+
+  const handleClearGallery = useCallback(() => {
+    // Clear gallery from state and localStorage
+    setGalleryImageRelativePaths([]);
+    localStorage.removeItem(GALLERY_STORAGE_KEY);
+  }, []);
+
   // --- Upload Logic (moved from ImageUploader) ---
   const processFile = useCallback((file: File | null) => {
     setUploadError(null); // Clear previous errors
@@ -244,41 +262,66 @@ function App() {
   const isGenerateDisabled = !uploadedImageData || isLoading;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col transition-colors duration-200">
       {/* Header */}
-      <header className="bg-white shadow-md p-4 sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-center text-blue-600">
-          AI Fashion Image Generator (V1)
-        </h1>
+      <header className="bg-white dark:bg-gray-800 shadow-md p-4 sticky top-0 z-10 transition-colors duration-200">
+        <div className="flex justify-between items-center max-w-7xl mx-auto">
+          <h1 className="text-xl sm:text-2xl font-bold text-primary-600 dark:text-primary-400 transition-colors duration-200">
+            AI Fashion Image Generator
+          </h1>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main Content Area */}
       <main className="flex-grow p-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-12 gap-6"> {/* Removed container mx-auto, added padding */}
 
         {/* Settings Panel (Left Column - takes 3/12) */}
-        <section className="md:col-span-3 lg:max-w-sm bg-white p-4 rounded shadow flex flex-col space-y-4 self-start md:sticky top-[calc(4rem+1rem)]"> {/* Added lg:max-w-sm */}
-          <h2 className="text-xl font-semibold mb-3 border-b pb-2">Settings</h2>
-          {/* ImageUploader component is fully removed */}
-          {handleModelSettingsChange && <ModelSettings onChange={handleModelSettingsChange} />}
-          {handleEnvironmentSettingsChange && <EnvironmentSettings onChange={handleEnvironmentSettingsChange} />}
-          <div className="mt-auto pt-4"> {/* Push button to bottom */}
-            <GenerationButton
-                onClick={handleGenerateClick}
-                isLoading={isLoading}
-                isDisabled={isGenerateDisabled}
-            />
+        <section className="md:col-span-3 lg:max-w-sm bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col space-y-4 self-start md:sticky top-[calc(4rem+1rem)] transition-colors duration-200">
+          <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2">
+            <h2 className="text-xl font-semibold">Settings</h2>
+            {/* Mobile toggle button */}
+            <button
+              className="md:hidden text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              onClick={toggleSettingsPanel}
+              aria-expanded={isSettingsPanelOpen}
+              aria-controls="settings-panel"
+            >
+              {isSettingsPanelOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Settings content - collapsible on mobile */}
+          <div id="settings-panel" className={`${isSettingsPanelOpen ? 'block' : 'hidden md:block'} space-y-4 animate-fade-in`}>
+            {handleModelSettingsChange && <ModelSettings onChange={handleModelSettingsChange} />}
+            {handleEnvironmentSettingsChange && <EnvironmentSettings onChange={handleEnvironmentSettingsChange} />}
+            <div className="mt-auto pt-4"> {/* Push button to bottom */}
+              <GenerationButton
+                  onClick={handleGenerateClick}
+                  isLoading={isLoading}
+                  isDisabled={isGenerateDisabled}
+              />
+            </div>
           </div>
         </section>
 
         {/* Comparison Area (Center/Right Columns - takes 9/12) */}
-        <section className="md:col-span-9 bg-white p-4 rounded shadow flex flex-col">
-            <h2 className="text-xl font-semibold mb-3 border-b pb-2 w-full">Comparison</h2>
+        <section className="md:col-span-9 bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col transition-colors duration-200">
+            <h2 className="text-xl font-semibold mb-3 border-b border-gray-200 dark:border-gray-700 pb-2 w-full">Comparison</h2>
             {/* Grid for side-by-side images */}
-            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 relative min-h-[400px] lg:min-h-[500px]"> {/* flex-grow was already here, ensure parent section has flex-col */}
+            <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-4 relative min-h-[400px] lg:min-h-[500px]"> {/* Changed md: to lg: for better tablet experience */}
 
               {/* Original Image Area (Now includes Upload) */}
-              <div className="border border-gray-200 rounded p-4 flex flex-col items-center justify-center bg-gray-50 relative group min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[500px]"> {/* Increased padding, explicit border color */}
-                 <h3 className="text-lg font-semibold text-gray-800 mb-3 w-full text-center">Original</h3> {/* Removed absolute, centered, added margin, bolder */}
+              <div className="border border-gray-200 dark:border-gray-700 rounded p-4 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 relative group min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[500px] transition-colors duration-200">
+                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 w-full text-center transition-colors duration-200">Original</h3>
                  {/* Hidden File Input */}
                  <input
                     id="fileInput"
@@ -288,11 +331,10 @@ function App() {
                     className="hidden"
                  />
                  {/* Drop Zone / Display Area - Takes full space */}
-                 {/* This div now needs flex-grow to fill the parent's flex container */}
                  <div
                     className={`absolute inset-0 flex items-center justify-center overflow-hidden p-1 rounded-md cursor-pointer border-2 border-dashed flex-grow
-                                ${isDragging ? 'border-blue-500 bg-blue-100' : 'border-gray-200 hover:border-gray-400'} {/* Lighter border */}
-                                ${uploadedImageData ? 'border-transparent hover:border-gray-400' : ''} // Make border transparent when image shown, reappear on hover
+                                ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500'}
+                                ${uploadedImageData ? 'border-transparent hover:border-gray-400 dark:hover:border-gray-500' : ''}
                                 transition-all duration-200 ease-in-out`}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -302,9 +344,9 @@ function App() {
                    {uploadedImageData ? (
                      <img src={uploadedImageData} alt="Original Upload" className="max-w-full max-h-full object-contain rounded shadow-sm"/>
                    ) : (
-                     <div className="text-center text-gray-500 p-4">
+                     <div className="text-center text-gray-500 dark:text-gray-400 p-4 transition-colors duration-200">
                         {/* Upload Icon */}
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 mb-2 transition-colors duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                         </svg>
                         <p className="font-semibold">{isDragging ? 'Drop image here' : 'Click or drag & drop image'}</p>
@@ -316,7 +358,7 @@ function App() {
                  {uploadedImageData && (
                     <button
                         onClick={handleClearUpload}
-                        className="absolute top-2 right-2 z-10 p-1.5 bg-black bg-opacity-30 hover:bg-opacity-50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        className="absolute top-2 right-2 z-10 p-1.5 bg-black dark:bg-white bg-opacity-30 dark:bg-opacity-20 hover:bg-opacity-50 dark:hover:bg-opacity-30 text-white dark:text-gray-200 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                         aria-label="Clear uploaded image"
                     >
                          {/* Using a smaller trash icon */}
@@ -327,26 +369,26 @@ function App() {
                  )}
                  {/* Upload Error Display - Positioned at the bottom */}
                  {uploadError && (
-                    <div className="absolute bottom-2 left-2 right-2 p-1 bg-red-100 border border-red-400 text-red-700 text-xs rounded text-center">
+                    <div className="absolute bottom-2 left-2 right-2 p-1 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-300 text-xs rounded text-center transition-colors duration-200">
                         {uploadError}
                     </div>
                   )}
               </div>
 
               {/* Generated Image Area & Prompt */}
-              <div className="border border-gray-200 rounded p-4 flex flex-col items-center justify-start bg-gray-50 relative h-full"> {/* Removed min-h, added h-full */}
-                 <h3 className="text-lg font-semibold text-gray-800 mb-3 w-full text-center">Generated</h3> {/* Removed absolute, centered, added margin, bolder */}
+              <div className="border border-gray-200 dark:border-gray-700 rounded p-4 flex flex-col items-center justify-start bg-gray-50 dark:bg-gray-800 relative h-full transition-colors duration-200">
+                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 w-full text-center transition-colors duration-200">Generated</h3>
                  {/* Image container */}
-                 <div className="relative w-full flex-grow flex items-center justify-center overflow-hidden p-1"> {/* flex-grow is already here */}
+                 <div className="relative w-full flex-grow flex items-center justify-center overflow-hidden p-1">
                     <LoadingIndicator isActive={isLoading} /> {/* Overlay */}
                     {/* ImageViewer handles its own placeholder */}
                     <ImageViewer imageUrl={generatedImageRelativePath ? `${API_BASE_URL}${generatedImageRelativePath}` : null} isLoading={isLoading} />
                  </div>
                  {/* Prompt Display Area - Conditionally render below image */}
                  {generatedPrompt && !isLoading && generatedImageRelativePath && (
-                    <div className="w-full mt-3 pt-3 border-t border-gray-200">
-                        <h4 className="text-sm font-medium text-gray-600 mb-1 px-1">Prompt Used:</h4>
-                        <pre className="text-xs bg-white p-2 rounded overflow-x-auto whitespace-pre-wrap break-words font-mono border border-gray-200"> {/* Changed bg-gray-100 to bg-white and added border */}
+                    <div className="w-full mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 transition-colors duration-200">
+                        <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 px-1 transition-colors duration-200">Prompt Used:</h4>
+                        <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded overflow-x-auto whitespace-pre-wrap break-words font-mono border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-300 transition-colors duration-200">
                             {generatedPrompt}
                         </pre>
                     </div>
@@ -363,17 +405,17 @@ function App() {
       </main>
 
       {/* Gallery Section */}
-      <section className="p-4 sm:px-6 lg:px-8 mt-4 bg-white rounded shadow"> {/* Removed container mx-auto, added padding */}
-         <h2 className="text-xl font-semibold mb-3 border-b pb-2">Recent Generations</h2>
+      <section className="p-4 sm:px-6 lg:px-8 mt-4 bg-white dark:bg-gray-800 rounded shadow transition-colors duration-200">
+         <h2 className="text-xl font-semibold mb-3 border-b border-gray-200 dark:border-gray-700 pb-2 transition-colors duration-200">Recent Generations</h2>
          <Gallery
             imageUrls={galleryImageRelativePaths.map(relPath => `${API_BASE_URL}${relPath}`)}
             onThumbnailClick={handleThumbnailClick}
+            onClearGallery={handleClearGallery}
          />
       </section>
 
       {/* Footer */}
-      {/* Added padding to footer to align with main content */}
-      <footer className="text-center p-4 sm:px-6 lg:px-8 mt-4 text-sm text-gray-500">
+      <footer className="text-center p-4 sm:px-6 lg:px-8 mt-4 text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
         Fashion AI V1
       </footer>
     </div>

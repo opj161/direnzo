@@ -46,8 +46,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(IMAGE_ROUTE_PREFIX, express.static(IMAGES_DIR));
 console.log(`Serving static images from ${IMAGES_DIR} at route ${IMAGE_ROUTE_PREFIX}`);
 
-// --- Helper Function for Background Descriptions ---
-// (Mimics logic from the successful frontend component)
+// --- Helper Functions for Prompt Generation ---
+// Background description function
 function getBackgroundDescription(settings) {
     const custom = settings?.environmentSettings?.backgroundCustom;
     if (custom) {
@@ -55,21 +55,81 @@ function getBackgroundDescription(settings) {
     }
 
     const preset = settings?.environmentSettings?.backgroundPreset || 'studio-white'; // Default to studio white
+    const season = settings?.environmentSettings?.season || '';
+
+    // Start with the base description
+    let description = '';
 
     switch (preset) {
-        case 'studio-white': return 'Clean, professional white studio background';
-        case 'studio-gradient': return 'Clean, professional studio background with a subtle color gradient';
-        case 'in-store': return 'Tasteful retail store environment with appropriate fixtures';
-        case 'lifestyle-home': return 'Lifestyle home setting with tasteful, uncluttered interior design';
-        case 'lifestyle-office': return 'Professional lifestyle office setting';
-        case 'outdoor-urban': return 'Outdoor urban city setting with appropriate architecture';
-        case 'outdoor-nature': return 'Outdoor nature setting with appropriate natural elements (trees, greenery, sky)';
-        case 'seasonal-spring': return 'Outdoor setting with a bright, fresh Spring atmosphere';
-        case 'seasonal-summer': return 'Outdoor setting with a warm, sunny Summer atmosphere';
-        case 'seasonal-fall': return 'Outdoor setting with a crisp, colorful Autumn/Fall atmosphere';
-        case 'seasonal-winter': return 'Outdoor setting with a cool, possibly snowy Winter atmosphere';
-        default: return 'Clean, well-lit background'; // Fallback
+        case 'studio-white': description = 'Clean, professional white studio background'; break;
+        case 'studio-gradient': description = 'Clean, professional studio background with a subtle color gradient'; break;
+        case 'in-store': description = 'Tasteful retail store environment with appropriate fixtures'; break;
+        case 'lifestyle-home': description = 'Lifestyle home setting with tasteful, uncluttered interior design'; break;
+        case 'lifestyle-office': description = 'Professional lifestyle office setting'; break;
+        case 'outdoor-urban': description = 'Outdoor urban city setting with appropriate architecture'; break;
+        case 'outdoor-nature': description = 'Outdoor nature setting with appropriate natural elements (trees, greenery, sky)'; break;
+        case 'seasonal-spring': description = 'Outdoor setting with a bright, fresh Spring atmosphere'; break;
+        case 'seasonal-summer': description = 'Outdoor setting with a warm, sunny Summer atmosphere'; break;
+        case 'seasonal-fall': description = 'Outdoor setting with a crisp, colorful Autumn/Fall atmosphere'; break;
+        case 'seasonal-winter': description = 'Outdoor setting with a cool, possibly snowy Winter atmosphere'; break;
+        default: description = 'Clean, well-lit background'; // Fallback
     }
+
+    // Add season if it's specified and not already included in the preset - ensure it's a string
+    if (season && typeof season === 'string' && !preset.includes('seasonal')) {
+        description += ` during ${season} season`;
+    }
+
+    return description;
+}
+
+// Weather and time of day description function
+function getAtmosphericDescription(settings) {
+    // Safely check if properties exist
+    const timeOfDay = settings?.environmentSettings?.timeOfDay || '';
+    const weather = settings?.environmentSettings?.weather || '';
+
+    let description = '';
+
+    // Add time of day if specified and is a string
+    if (timeOfDay && typeof timeOfDay === 'string') {
+        description += `during ${timeOfDay.toLowerCase()}`;
+    }
+
+    // Add weather if specified and is a string
+    if (weather && typeof weather === 'string') {
+        if (description) {
+            description += ` with ${weather.toLowerCase()} weather conditions`;
+        } else {
+            description += `With ${weather.toLowerCase()} weather conditions`;
+        }
+    }
+
+    return description;
+}
+
+// Camera and lighting description function
+function getTechnicalDescription(settings) {
+    // Safely get properties with defaults
+    const lighting = settings?.environmentSettings?.lighting || 'Studio Softbox';
+    const lensStyle = settings?.environmentSettings?.lensStyle || 'Fashion Magazine (Standard)';
+    const cameraAngle = settings?.environmentSettings?.cameraAngle || 'Eye Level';
+
+    let description = 'Professional fashion photography with ';
+
+    // Add lighting - ensure it's a string
+    description += `${typeof lighting === 'string' ? lighting : 'Studio Softbox'} lighting, `;
+
+    // Add lens style - ensure it's a string
+    description += `shot with a ${typeof lensStyle === 'string' ? lensStyle : 'Fashion Magazine (Standard)'} lens style, `;
+
+    // Add camera angle - ensure it's a string
+    description += `from a ${typeof cameraAngle === 'string' ? cameraAngle : 'Eye Level'} angle, `;
+
+    // Add final technical details
+    description += 'with perfect exposure and color accuracy.';
+
+    return description;
 }
 
 // --- Routes ---
@@ -112,34 +172,64 @@ app.post('/generate', async (req, res) => {
         subjectAttributes.push(`with ${modelSettings.bodyType} body proportions`);
     }
 
-     // Add age range if specified and meaningful (not default/generic)
-     // Assuming 'default' age might be represented by '26-35' or similar, or just absence.
-     // Be more specific if frontend sends clear non-default indicators.
-     // For now, include if present and seems specific.
+    // Add age range if specified and meaningful (not default/generic)
     if (modelSettings.ageRange && modelSettings.ageRange.toLowerCase() !== 'default' && modelSettings.ageRange !== '26-35' /* Example default */) {
         subjectAttributes.push(`in the ${modelSettings.ageRange} age range`);
+    }
+
+    // Add height if specified - safely check if property exists
+    if (modelSettings.height && typeof modelSettings.height === 'string' && modelSettings.height.toLowerCase() !== 'average') {
+        subjectAttributes.push(`of ${modelSettings.height.toLowerCase()} height`);
+    }
+
+    // Add hair style if specified - safely check if property exists
+    if (modelSettings.hairStyle && typeof modelSettings.hairStyle === 'string') {
+        // Add hair color if specified
+        if (modelSettings.hairColor && typeof modelSettings.hairColor === 'string') {
+            subjectAttributes.push(`with ${modelSettings.hairStyle.toLowerCase()}, ${modelSettings.hairColor.toLowerCase()} hair`);
+        } else {
+            subjectAttributes.push(`with ${modelSettings.hairStyle.toLowerCase()} hair`);
+        }
+    } else if (modelSettings.hairColor && typeof modelSettings.hairColor === 'string') {
+        // Only hair color specified
+        subjectAttributes.push(`with ${modelSettings.hairColor.toLowerCase()} hair`);
+    }
+
+    // Add accessories if specified and not 'None' - safely check if property exists
+    if (modelSettings.accessories && typeof modelSettings.accessories === 'string' && modelSettings.accessories.toLowerCase() !== 'none') {
+        subjectAttributes.push(`wearing ${modelSettings.accessories.toLowerCase()}`);
     }
 
     // Construct the subject string
     const attributeString = subjectAttributes.length > 0 ? subjectAttributes.join(', ') + ' ' : '';
     const gender = modelSettings.gender || 'female'; // Default to female if not specified
-    // Basic pose instruction - could be expanded if pose setting is added
-    const poseDescription = "standing in a natural, relaxed pose";
+
+    // Use the pose setting if available, otherwise default - safely check if property exists
+    const poseDescription = (modelSettings.pose && typeof modelSettings.pose === 'string')
+        ? `in a ${modelSettings.pose.toLowerCase()} pose`
+        : "standing in a natural, relaxed pose";
 
     const subjectSection = `a ${attributeString}${gender} fashion model ${poseDescription} wearing the clothing item shown in the provided image`;
 
     // Get the descriptive setting string
     const settingSection = getBackgroundDescription(settings);
 
-    // Define the crucial Style section (taken from successful frontend prompt)
+    // Get atmospheric conditions (time of day, weather)
+    const atmosphericSection = getAtmosphericDescription(settings);
+
+    // Combine setting and atmospheric conditions if both exist
+    const fullSettingSection = atmosphericSection
+        ? `${settingSection} ${atmosphericSection}`
+        : settingSection;
+
+    // Define the crucial Style section
     const styleSection = `The model should look authentic and relatable with a natural expression and a subtle smile. The clothing must fit perfectly and be the visual focus of the image.`;
 
-    // Define the crucial Technical details section (taken from successful frontend prompt)
-    // Note: We ignore the old simple 'lighting' and 'lensStyle' settings as this paragraph is better.
-    const technicalSection = `Professional fashion photography lighting with perfect exposure and color accuracy.`;
+    // Get the technical details with camera and lighting settings
+    const technicalSection = getTechnicalDescription(settings);
 
     // Assemble the final structured prompt
-    const textPrompt = `CREATE A PHOTOREALISTIC IMAGE of ${subjectSection}\n\nSetting: ${settingSection}\n\nStyle: ${styleSection}\n\nTechnical details: ${technicalSection}`;
+    const textPrompt = `CREATE A PHOTOREALISTIC IMAGE of ${subjectSection}\n\nSetting: ${fullSettingSection}\n\nStyle: ${styleSection}\n\nTechnical details: ${technicalSection}`;
 
     console.log("Constructed Structured Prompt:\n", textPrompt); // Log the improved prompt
 

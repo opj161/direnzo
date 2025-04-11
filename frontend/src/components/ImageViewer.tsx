@@ -7,21 +7,21 @@ interface ImageViewerProps {
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, isLoading }) => {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-slate-50 rounded min-h-[300px] md:min-h-[400px] lg:min-h-[500px] overflow-hidden"> {/* Updated background */}
+    <div className="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-gray-800 rounded min-h-[300px] md:min-h-[400px] lg:min-h-[500px] overflow-hidden transition-colors duration-200">
       {isLoading && !imageUrl && (
-         // This state is tricky - usually covered by the main loading indicator.
-         // We might just show the placeholder until the image URL is ready.
-         <p className="text-gray-500">Loading image...</p>
+         <p className="text-gray-500 dark:text-gray-400 animate-pulse transition-colors duration-200">
+           Loading image...
+         </p>
       )}
       {!isLoading && imageUrl && (
         <img
           src={imageUrl}
           alt="Generated Fashion"
-          className="max-w-full max-h-full object-contain" // Ensure image fits within bounds
+          className="max-w-full max-h-full object-contain animate-fade-in"
         />
       )}
       {!isLoading && !imageUrl && (
-        <p className="text-gray-500 text-center px-4">
+        <p className="text-gray-500 dark:text-gray-400 text-center px-4 transition-colors duration-200">
           Upload an image and configure settings to generate a new fashion visual.
         </p>
       )}

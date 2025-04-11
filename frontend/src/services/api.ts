@@ -1,5 +1,6 @@
 import { ModelSettingsState } from '../components/ModelSettings';
 import { EnvironmentSettingsState } from '../components/EnvironmentSettings';
+import { API_BASE_URL } from '../constants'; // Trying relative path from src
 
 // Define the expected structure of the backend request payload
 interface GenerateApiPayload {
@@ -39,9 +40,7 @@ function isErrorResponse(response: unknown): response is GenerateApiErrorRespons
 }
 
 
-// Get the backend URL from environment variables (Vite specific)
-// Fallback to localhost for local development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+// API_BASE_URL is now imported from constants.ts
 
 /**
  * Calls the backend API to generate an image.

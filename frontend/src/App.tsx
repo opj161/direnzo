@@ -1,99 +1,90 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 // Import Components
-import ModelSettings, { ModelSettingsState } from './components/ModelSettings';
-import EnvironmentSettings, { EnvironmentSettingsState } from './components/EnvironmentSettings';
+import ModelSettings from './components/ModelSettings'; // Removed unused ModelSettingsState import
+import EnvironmentSettings from './components/EnvironmentSettings'; // Removed unused EnvironmentSettingsState import
 import GenerationButton from './components/GenerationButton';
 import ImageViewer from './components/ImageViewer';
 import Gallery from './components/Gallery';
 import LoadingIndicator from './components/LoadingIndicator';
 import ErrorMessage from './components/ErrorMessage';
 import ThemeToggle from './components/ThemeToggle';
+import ImageUploader from './components/ImageUploader';
 import { generateImage } from './services/api';
 import { initializeTheme } from './utils/themeUtils';
-
-// Get the backend URL from environment variables (Vite specific)
-// Fallback to localhost for local development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-
-// LocalStorage key
-const GALLERY_STORAGE_KEY = 'aiFashionGallery_v1';
-const MAX_GALLERY_ITEMS = 20; // As per PRD
-
-// --- Upload Constants ---
-const MAX_FILE_SIZE_MB = 10;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const ACCEPTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
-const ACCEPTED_FORMATS_STRING = ACCEPTED_FORMATS.join(',');
+import useSettingsStore from './store/settingsStore'; // Import stores
+import useGenerationStore from './store/generationStore';
+import useGalleryStore from './store/galleryStore';
+import IconContentCopy from '@material-design-icons/svg/filled/content_copy.svg'; // Import copy icon
+import {
+  API_BASE_URL,
+  // GALLERY_STORAGE_KEY and MAX_GALLERY_ITEMS are now used within galleryStore
+} from './constants';
 
 function App() {
-  // --- State Management ---
-  const [uploadedImageData, setUploadedImageData] = useState<string | null>(null);
-  const [modelSettings, setModelSettings] = useState<ModelSettingsState | null>(null); // Initialize later
-  const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettingsState | null>(null); // Initialize later
-  // State stores the *relative* path from the backend or localStorage
-  const [generatedImageRelativePath, setGeneratedImageRelativePath] = useState<string | null>(null);
-  // State stores the list of *relative* paths from localStorage
-  const [galleryImageRelativePaths, setGalleryImageRelativePaths] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null); // State for the prompt
-  // --- Upload State (moved from ImageUploader) ---
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  // --- State from Stores ---
+  const { modelSettings, environmentSettings } = useSettingsStore(state => ({
+    modelSettings: state.modelSettings,
+    environmentSettings: state.environmentSettings,
+  }));
+  const {
+    uploadedImageData,
+    generatedImageRelativePath,
+    generatedPrompt,
+    isLoading,
+    errorMessage,
+    // uploadError, // Removed as it's handled within ImageUploader
+    setUploadedImageData,
+    setGeneratedImageRelativePath,
+    setGeneratedPrompt,
+    setIsLoading,
+    setErrorMessage,
+    setUploadError, // Keep setUploadError as it's passed to ImageUploader
+    clearGenerationState,
+  } = useGenerationStore();
+  const { galleryItems, addImage, clearGallery } = useGalleryStore(); // Use galleryItems instead
+
+  // --- Local UI State ---
+  // Upload error state is managed by generationStore now
+  // isDragging state is managed within ImageUploader
   // --- Responsive UI State ---
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState<boolean>(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle'); // State for copy feedback
 
   // Initialize theme on component mount
   useEffect(() => {
     initializeTheme();
   }, []);
 
-  // --- Load Gallery from localStorage on initial mount ---
+  // Gallery loading is handled by persist middleware in galleryStore
+  // Effect to potentially load the latest gallery image into the viewer on initial load
   useEffect(() => {
-    try {
-      const storedGallery = localStorage.getItem(GALLERY_STORAGE_KEY);
-      if (storedGallery) {
-        const parsedUrls: string[] = JSON.parse(storedGallery);
-        // Basic validation if needed (e.g., check if it's an array of strings)
-        // Ensure stored data is an array of strings (relative paths)
-        if (Array.isArray(parsedUrls) && parsedUrls.every(item => typeof item === 'string' && item.startsWith('/'))) {
-             setGalleryImageRelativePaths(parsedUrls);
-             // Optionally display the latest image from the gallery on load
-             if (parsedUrls.length > 0) {
-                setGeneratedImageRelativePath(parsedUrls[0]); // Set the relative path
-             }
-        } else {
-            console.warn("Invalid gallery data found in localStorage. Resetting.");
-            localStorage.removeItem(GALLERY_STORAGE_KEY);
-        }
-      }
-    } catch (error) {
-        console.error("Failed to load gallery from localStorage:", error);
-        // Optionally clear corrupted data
-        localStorage.removeItem(GALLERY_STORAGE_KEY);
+    // Zustand ensures stores are hydrated before effects run
+    // Update to use galleryItems
+    if (galleryItems.length > 0 && !generatedImageRelativePath) {
+      setGeneratedImageRelativePath(galleryItems[0].relativePath); // Get path from first item
     }
-  }, []); // Empty dependency array ensures this runs only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount after hydration
 
   // --- Callback Handlers ---
+  // Use actions from generationStore
   const handleImageUpload = useCallback((imageData: string | null) => {
     setUploadedImageData(imageData);
-    setErrorMessage(null); // Clear generation error on new upload
-    setUploadError(null); // Clear upload error on new upload
-    // Clear generated image view and prompt if a new image is uploaded
-    setGeneratedImageRelativePath(null);
-    setGeneratedPrompt(null);
-  }, []);
+    setErrorMessage(null);
+    setUploadError(null);
+    // Clear previous generation output if new image is uploaded
+    if (imageData) {
+       clearGenerationState();
+    }
+  }, [setUploadedImageData, setErrorMessage, setUploadError, clearGenerationState]);
 
-  const handleModelSettingsChange = useCallback((settings: ModelSettingsState) => {
-    setModelSettings(settings);
-  }, []);
-
-  const handleEnvironmentSettingsChange = useCallback((settings: EnvironmentSettingsState) => {
-    setEnvironmentSettings(settings);
-  }, []);
+  // Settings components will interact directly with settingsStore, remove these handlers
+  // const handleModelSettingsChange = ...
+  // const handleEnvironmentSettingsChange = ...
 
   const handleGenerateClick = useCallback(async () => {
+    // Access settings directly from the store
     if (!uploadedImageData || !modelSettings || !environmentSettings) {
       setErrorMessage('Please upload an image and ensure all settings are selected.');
       return;
@@ -101,8 +92,8 @@ function App() {
 
     setIsLoading(true);
     setErrorMessage(null);
-    setGeneratedImageRelativePath(null); // Clear previous image while generating
-    setGeneratedPrompt(null); // Clear previous prompt
+    // Clear previous generation state using action
+    clearGenerationState();
 
     const payload = {
       settings: { modelSettings, environmentSettings },
@@ -117,21 +108,11 @@ function App() {
       const { imageUrl: imageRelativePath, promptUsed } = await generateImage(payload);
       console.log("API Success. Image Relative Path:", imageRelativePath);
       console.log("API Success. Prompt Used:", promptUsed); // Log the received prompt
-      setGeneratedImageRelativePath(imageRelativePath); // Store the relative path
-      setGeneratedPrompt(promptUsed); // Store the prompt
+      setGeneratedImageRelativePath(imageRelativePath); // Use store action
+      setGeneratedPrompt(promptUsed); // Use store action
 
-      // --- Update Gallery & localStorage ---
-      // Store relative paths in state and localStorage
-      setGalleryImageRelativePaths(prevPaths => {
-        const newPaths = [imageRelativePath, ...prevPaths].slice(0, MAX_GALLERY_ITEMS); // Add relative path
-        try {
-          localStorage.setItem(GALLERY_STORAGE_KEY, JSON.stringify(newPaths)); // Save relative paths
-        } catch (storageError) {
-          console.error("Failed to save gallery to localStorage:", storageError);
-          setErrorMessage("Generated image displayed, but failed to save to local gallery.");
-        }
-        return newPaths;
-      });
+      // --- Update Gallery Store ---
+      addImage(imageRelativePath); // Use gallery store action
 
     } catch (error) {
       console.error("Generation API Error:", error);
@@ -145,118 +126,45 @@ function App() {
       setIsLoading(false);
     }
 
-  }, [uploadedImageData, modelSettings, environmentSettings]); // Dependencies for the generation logic
+  // Dependencies now include store actions and state values used in the check
+  }, [
+    uploadedImageData,
+    modelSettings,
+    environmentSettings,
+    setIsLoading,
+    setErrorMessage,
+    setGeneratedImageRelativePath,
+    setGeneratedPrompt,
+    addImage,
+    clearGenerationState
+  ]);
 
-  const handleThumbnailClick = useCallback((url: string) => {
-    // url here is the full URL constructed by the Gallery component mapping
-    // We need to extract the relative path to set the state correctly
-    try {
-        const urlObject = new URL(url);
-        const relativePath = urlObject.pathname; // Extracts path like /images/uuid.jpg
-        setGeneratedImageRelativePath(relativePath); // Set the relative path state
-        setGeneratedPrompt(null); // Clear prompt when selecting from gallery (it wasn't saved with gallery items)
-    } catch (e) {
-        console.error("Invalid URL clicked in gallery:", url, e);
-        setErrorMessage("Could not display the selected gallery image.");
-        setGeneratedImageRelativePath(null);
-        setGeneratedPrompt(null);
-    }
-    setErrorMessage(null); // Clear any previous errors
-  }, []);
+  // Updated to accept relativePath directly from Gallery component
+  // Use store actions
+  const handleThumbnailClick = useCallback((relativePath: string) => {
+    setGeneratedImageRelativePath(relativePath);
+    setGeneratedPrompt(null);
+    setErrorMessage(null);
+  }, [setGeneratedImageRelativePath, setGeneratedPrompt, setErrorMessage]);
 
+  // Use store actions
   const handleDismissError = useCallback(() => {
     setErrorMessage(null);
-    setUploadError(null); // Also clear upload error
-  }, []);
+    setUploadError(null);
+  }, [setErrorMessage, setUploadError]);
 
   const toggleSettingsPanel = useCallback(() => {
     setIsSettingsPanelOpen(prev => !prev);
   }, []);
 
+  // Use store action (already includes clearing state)
   const handleClearGallery = useCallback(() => {
-    // Clear gallery from state and localStorage
-    setGalleryImageRelativePaths([]);
-    localStorage.removeItem(GALLERY_STORAGE_KEY);
-  }, []);
+    clearGallery();
+  }, [clearGallery]);
 
-  // --- Upload Logic (moved from ImageUploader) ---
-  const processFile = useCallback((file: File | null) => {
-    setUploadError(null); // Clear previous errors
-
-    if (!file) {
-        handleImageUpload(null); // Clear image data in parent if file is null
-        return;
-    }
-
-    // Validate file type
-    if (!ACCEPTED_FORMATS.includes(file.type)) {
-      setUploadError(`Invalid format. Use ${ACCEPTED_FORMATS.map(f => f.split('/')[1]).join(', ')}.`);
-      handleImageUpload(null);
-      return;
-    }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      setUploadError(`File too large. Max ${MAX_FILE_SIZE_MB}MB.`);
-      handleImageUpload(null);
-      return;
-    }
-
-    // Read file as Data URL
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      handleImageUpload(base64String); // Pass base64 data up
-      setUploadError(null); // Clear error on success
-    };
-    reader.onerror = () => {
-      setUploadError('Failed to read file.');
-      handleImageUpload(null);
-    };
-    reader.readAsDataURL(file);
-  }, [handleImageUpload]); // Include handleImageUpload dependency
-
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    processFile(file || null);
-    // Reset input value to allow uploading the same file again
-    event.target.value = '';
-  }, [processFile]);
-
-  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    // Only set dragging to false if leaving the actual drop zone, not its children
-    if (event.currentTarget.contains(event.relatedTarget as Node)) {
-        return;
-    }
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragging(false);
-    const file = event.dataTransfer.files?.[0];
-    processFile(file || null);
-  }, [processFile]);
-
-  const handleClearUpload = useCallback(() => {
-    processFile(null); // This calls handleImageUpload(null) and clears errors
-    // No need to clear generated image/prompt here, handleImageUpload already does it
-    // Ensure the hidden file input is cleared if needed, though processFile(null) should suffice
-    const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-    if (fileInput) {
-        fileInput.value = '';
-    }
-  }, [processFile]);
-  // --- End Upload Logic ---
+  // --- Upload Logic is now encapsulated in ImageUploader ---
+  // The handleImageUpload callback is still needed to receive the data
+  // The setUploadError callback is passed to ImageUploader to report errors
 
   // Determine if generate button should be disabled
   const isGenerateDisabled = !uploadedImageData || isLoading;
@@ -301,13 +209,14 @@ function App() {
 
           {/* Settings content - collapsible on mobile */}
           <div id="settings-panel" className={`${isSettingsPanelOpen ? 'block' : 'hidden md:block'} space-y-4 animate-fade-in`}>
-            {handleModelSettingsChange && <ModelSettings onChange={handleModelSettingsChange} />}
-            {handleEnvironmentSettingsChange && <EnvironmentSettings onChange={handleEnvironmentSettingsChange} />}
+            {/* Remove onChange props, components will use store directly */}
+            <ModelSettings />
+            <EnvironmentSettings />
             <div className="mt-auto pt-4"> {/* Push button to bottom */}
               <GenerationButton
                   onClick={handleGenerateClick}
-                  isLoading={isLoading}
-                  isDisabled={isGenerateDisabled}
+                  isLoading={isLoading} // Get from store
+                  isDisabled={isGenerateDisabled} // Calculated from store state
               />
             </div>
           </div>
@@ -317,77 +226,52 @@ function App() {
         <section className="md:col-span-9 bg-white dark:bg-gray-800 p-4 rounded shadow flex flex-col transition-colors duration-200">
             <h2 className="text-xl font-semibold mb-3 border-b border-gray-200 dark:border-gray-700 pb-2 w-full">Comparison</h2>
             {/* Grid for side-by-side images */}
-            <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-4 relative min-h-[400px] lg:min-h-[500px]"> {/* Changed md: to lg: for better tablet experience */}
+            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 relative min-h-[400px] lg:min-h-[500px]"> {/* Changed lg: to md: for earlier breakpoint */}
 
-              {/* Original Image Area (Now includes Upload) */}
-              <div className="border border-gray-200 dark:border-gray-700 rounded p-4 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 relative group min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[500px] transition-colors duration-200">
-                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 w-full text-center transition-colors duration-200">Original</h3>
-                 {/* Hidden File Input */}
-                 <input
-                    id="fileInput"
-                    type="file"
-                    accept={ACCEPTED_FORMATS_STRING}
-                    onChange={handleFileChange}
-                    className="hidden"
-                 />
-                 {/* Drop Zone / Display Area - Takes full space */}
-                 <div
-                    className={`absolute inset-0 flex items-center justify-center overflow-hidden p-1 rounded-md cursor-pointer border-2 border-dashed flex-grow
-                                ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500'}
-                                ${uploadedImageData ? 'border-transparent hover:border-gray-400 dark:hover:border-gray-500' : ''}
-                                transition-all duration-200 ease-in-out`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => !uploadedImageData && document.getElementById('fileInput')?.click()} // Only allow click to upload if no image
-                 >
-                   {uploadedImageData ? (
-                     <img src={uploadedImageData} alt="Original Upload" className="max-w-full max-h-full object-contain rounded shadow-sm"/>
-                   ) : (
-                     <div className="text-center text-gray-500 dark:text-gray-400 p-4 transition-colors duration-200">
-                        {/* Upload Icon */}
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 mb-2 transition-colors duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                        </svg>
-                        <p className="font-semibold">{isDragging ? 'Drop image here' : 'Click or drag & drop image'}</p>
-                        <p className="text-xs mt-1">({ACCEPTED_FORMATS.map(f => f.split('/')[1].toUpperCase()).join(', ')} up to {MAX_FILE_SIZE_MB}MB)</p>
-                     </div>
-                   )}
-                 </div>
-                 {/* Clear/Replace Button - More prominent, centered on hover */}
-                 {uploadedImageData && (
-                    <button
-                        onClick={handleClearUpload}
-                        className="absolute top-2 right-2 z-10 p-1.5 bg-black dark:bg-white bg-opacity-30 dark:bg-opacity-20 hover:bg-opacity-50 dark:hover:bg-opacity-30 text-white dark:text-gray-200 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                        aria-label="Clear uploaded image"
-                    >
-                         {/* Using a smaller trash icon */}
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                         </svg>
-                    </button>
-                 )}
-                 {/* Upload Error Display - Positioned at the bottom */}
-                 {uploadError && (
-                    <div className="absolute bottom-2 left-2 right-2 p-1 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-300 text-xs rounded text-center transition-colors duration-200">
-                        {uploadError}
-                    </div>
-                  )}
-              </div>
+              {/* Render the new ImageUploader component */}
+              <ImageUploader
+                uploadedImageData={uploadedImageData} // Get from store
+                onImageUpload={handleImageUpload} // Use App's handler (calls store action)
+                onError={setUploadError} // Use store action directly
+              />
+              {/* Display upload error reported by the uploader */}
+              {/* Upload error display is now part of ImageUploader, but we still need the state for the generation error message below */}
 
               {/* Generated Image Area & Prompt */}
               <div className="border border-gray-200 dark:border-gray-700 rounded p-4 flex flex-col items-center justify-start bg-gray-50 dark:bg-gray-800 relative h-full transition-colors duration-200">
                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 w-full text-center transition-colors duration-200">Generated</h3>
                  {/* Image container */}
                  <div className="relative w-full flex-grow flex items-center justify-center overflow-hidden p-1">
-                    <LoadingIndicator isActive={isLoading} /> {/* Overlay */}
+                    <LoadingIndicator isActive={isLoading} /> {/* Get from store */}
                     {/* ImageViewer handles its own placeholder */}
+                    {/* Pass state from store */}
                     <ImageViewer imageUrl={generatedImageRelativePath ? `${API_BASE_URL}${generatedImageRelativePath}` : null} isLoading={isLoading} />
                  </div>
                  {/* Prompt Display Area - Conditionally render below image */}
+                 {/* Use state from store */}
                  {generatedPrompt && !isLoading && generatedImageRelativePath && (
-                    <div className="w-full mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 transition-colors duration-200">
-                        <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 px-1 transition-colors duration-200">Prompt Used:</h4>
+                    <div className="w-full mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 transition-colors duration-200 relative group/prompt"> {/* Added relative positioning and group */}
+                        <div className="flex justify-between items-center mb-1 px-1">
+                            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors duration-200">Prompt Used:</h4>
+                            <button
+                                onClick={() => {
+                                    if (generatedPrompt) {
+                                        navigator.clipboard.writeText(generatedPrompt);
+                                        setCopyStatus('copied');
+                                        setTimeout(() => setCopyStatus('idle'), 1500); // Reset after 1.5s
+                                    }
+                                }}
+                                className="p-1 rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover/prompt:opacity-100 transition-all duration-150"
+                                aria-label="Copy prompt"
+                                title="Copy prompt"
+                            >
+                                {copyStatus === 'copied' ? (
+                                    <span className="text-xs text-primary-600 dark:text-primary-400">Copied!</span>
+                                ) : (
+                                    <img src={IconContentCopy} alt="Copy" className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
                         <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded overflow-x-auto whitespace-pre-wrap break-words font-mono border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-300 transition-colors duration-200">
                             {generatedPrompt}
                         </pre>
@@ -398,6 +282,7 @@ function App() {
             </div>
              {/* Generation Error Message below the comparison area */}
             <div className="mt-4">
+                {/* Use state and action from store */}
                 <ErrorMessage message={errorMessage} onDismiss={handleDismissError} />
             </div>
           </section>
@@ -408,9 +293,10 @@ function App() {
       <section className="p-4 sm:px-6 lg:px-8 mt-4 bg-white dark:bg-gray-800 rounded shadow transition-colors duration-200">
          <h2 className="text-xl font-semibold mb-3 border-b border-gray-200 dark:border-gray-700 pb-2 transition-colors duration-200">Recent Generations</h2>
          <Gallery
-            imageUrls={galleryImageRelativePaths.map(relPath => `${API_BASE_URL}${relPath}`)}
-            onThumbnailClick={handleThumbnailClick}
-            onClearGallery={handleClearGallery}
+            galleryItems={galleryItems} // Pass the full items array
+            apiBaseUrl={API_BASE_URL} // Constant
+            onThumbnailClick={handleThumbnailClick} // Use App's handler (calls store action)
+            onClearGallery={handleClearGallery} // Use App's handler (calls store action)
          />
       </section>
 

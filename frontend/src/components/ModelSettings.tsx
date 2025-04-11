@@ -1,6 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import CollapsibleSection from './CollapsibleSection';
 import VisualOptionSelector, { VisualOption } from './VisualOptionSelector';
+import useSettingsStore from '../store/settingsStore';
+
+// Import Material Icons (using filled style)
+// Note: Adjust paths if your setup requires specific import methods for SVGs
+import IconShortText from '@material-design-icons/svg/filled/short_text.svg';
+import IconNotes from '@material-design-icons/svg/filled/notes.svg'; // Placeholder for Medium
+import IconSubject from '@material-design-icons/svg/filled/subject.svg'; // Placeholder for Long
+import IconFormatLineSpacing from '@material-design-icons/svg/filled/format_line_spacing.svg'; // Placeholder for Straight/Wavy
+import IconTexture from '@material-design-icons/svg/filled/texture.svg'; // Placeholder for Curly
+import IconViewHeadline from '@material-design-icons/svg/filled/view_headline.svg'; // Placeholder for Braided
+import IconRadioButtonChecked from '@material-design-icons/svg/filled/radio_button_checked.svg'; // Placeholder for Bun
+import IconMoreVert from '@material-design-icons/svg/filled/more_vert.svg'; // Placeholder for Ponytail
 
 // Define options based on PRD (Section 3.2)
 const GENDER_OPTIONS = ['Female', 'Male', 'Androgynous'];
@@ -23,18 +35,48 @@ const HEIGHT_OPTIONS = ['Short', 'Average', 'Tall'];
 const POSE_OPTIONS = ['Standing', 'Sitting', 'Walking', 'Casual Pose', 'Fashion Pose'];
 const ACCESSORIES_OPTIONS = ['None', 'Glasses', 'Jewelry', 'Hat', 'Scarf', 'Multiple'];
 
-// Visual options for hair styles
+// --- Visual Options Definitions ---
+
+// Helper function to create icon components (adjust size/styling as needed)
+const createIcon = (IconComponent: string) => <img src={IconComponent} alt="" className="w-6 h-6" />;
+
+// Map styles to icons (using placeholders where direct icons aren't obvious)
+const hairStyleIconMap: { [key: string]: React.ReactNode } = {
+  'Short': createIcon(IconShortText),
+  'Medium': createIcon(IconNotes),
+  'Long': createIcon(IconSubject),
+  'Curly': createIcon(IconTexture),
+  'Straight': createIcon(IconFormatLineSpacing),
+  'Wavy': createIcon(IconFormatLineSpacing), // Reuse for Wavy
+  'Braided': createIcon(IconViewHeadline),
+  'Bun': createIcon(IconRadioButtonChecked),
+  'Ponytail': createIcon(IconMoreVert),
+};
+
 const HAIR_STYLE_VISUAL_OPTIONS: VisualOption[] = HAIR_STYLE_OPTIONS.map(style => ({
   value: style,
   label: style,
-  // Icons would be added here in a real implementation
+  icon: hairStyleIconMap[style] || undefined, // Assign icon from map
 }));
 
-// Visual options for hair colors
+// Map colors to Tailwind background classes (adjust colors as needed)
+const hairColorMap: { [key: string]: string } = {
+  'Black': 'bg-black',
+  'Brown': 'bg-yellow-900', // Using Tailwind's brown shades
+  'Blonde': 'bg-yellow-300',
+  'Red': 'bg-red-600',
+  'Gray': 'bg-gray-500',
+  'White': 'bg-white border border-gray-300', // Add border for visibility
+  'Colorful': 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500', // Example gradient
+};
+
+// Create colored divs as icons for hair colors
 const HAIR_COLOR_VISUAL_OPTIONS: VisualOption[] = HAIR_COLOR_OPTIONS.map(color => ({
   value: color,
   label: color,
-  // In a real implementation, we would use colored circles or icons
+  icon: (
+    <div className={`w-6 h-6 rounded-full ${hairColorMap[color] || 'bg-gray-400'}`}></div>
+  ),
 }));
 
 // Interface for the component's state
@@ -50,45 +92,33 @@ export interface ModelSettingsState {
   accessories: string;
 }
 
-// Interface for the component's props
-interface ModelSettingsProps {
-  onChange: (settings: ModelSettingsState) => void; // Callback to parent
-}
+// Props are no longer needed as state comes from the store
+// interface ModelSettingsProps { ... }
 
-const ModelSettings: React.FC<ModelSettingsProps> = ({ onChange }) => {
-  // Initialize state with default values (first option)
-  const [settings, setSettings] = useState<ModelSettingsState>({
-    gender: GENDER_OPTIONS[0],
-    bodyType: BODY_TYPE_OPTIONS[0],
-    ageRange: AGE_RANGE_OPTIONS[0],
-    ethnicity: ETHNICITY_OPTIONS[0],
-    hairStyle: HAIR_STYLE_OPTIONS[0],
-    hairColor: HAIR_COLOR_OPTIONS[0],
-    height: HEIGHT_OPTIONS[1], // Default to 'Average'
-    pose: POSE_OPTIONS[0],
-    accessories: ACCESSORIES_OPTIONS[0],
-  });
+const ModelSettings: React.FC = () => { // Removed props
+  // Get state and actions from the store
+  const modelSettings = useSettingsStore(state => state.modelSettings);
+  const setModelSettings = useSettingsStore(state => state.setModelSettings);
 
-  // Notify parent component when settings change
-  useEffect(() => {
-    onChange(settings);
-  }, [settings, onChange]);
+  // Local state and useEffect are no longer needed
 
   // Generic handler for dropdown changes
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = event.target;
-    setSettings(prevSettings => ({
-      ...prevSettings,
+    // Update the store state
+    setModelSettings({
+      ...modelSettings, // Get current state from store
       [name]: value,
-    }));
+    });
   };
 
   // Handler for visual option selectors
   const handleVisualOptionChange = (name: keyof ModelSettingsState, value: string) => {
-    setSettings(prevSettings => ({
-      ...prevSettings,
+    // Update the store state
+    setModelSettings({
+      ...modelSettings, // Get current state from store
       [name]: value,
-    }));
+    });
   };
 
   // Helper function to render a dropdown
@@ -106,7 +136,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onChange }) => {
         <select
           id={name}
           name={name}
-          value={settings[name]}
+          value={modelSettings[name]} // Use state from store
           onChange={handleChange}
           className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-primary-500 dark:focus:border-primary-400 sm:text-sm transition-colors duration-200"
         >
@@ -145,17 +175,17 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onChange }) => {
       <CollapsibleSection title="Hair & Appearance">
         <div className="space-y-3">
           <VisualOptionSelector
-            name="hairStyle"
+            // name="hairStyle" // Prop removed from VisualOptionSelector
             label="Hair Style"
             options={HAIR_STYLE_VISUAL_OPTIONS}
-            selectedValue={settings.hairStyle}
+            selectedValue={modelSettings.hairStyle} // Use state from store
             onChange={(value) => handleVisualOptionChange('hairStyle', value)}
           />
           <VisualOptionSelector
-            name="hairColor"
+            // name="hairColor" // Prop removed from VisualOptionSelector
             label="Hair Color"
             options={HAIR_COLOR_VISUAL_OPTIONS}
-            selectedValue={settings.hairColor}
+            selectedValue={modelSettings.hairColor} // Use state from store
             onChange={(value) => handleVisualOptionChange('hairColor', value)}
           />
         </div>

@@ -11,7 +11,7 @@ interface VisualOptionSelectorProps {
   options: VisualOption[];
   selectedValue: string;
   onChange: (value: string) => void;
-  name: string;
+  // name: string; // Removed unused prop
   label: string;
 }
 
@@ -19,7 +19,7 @@ const VisualOptionSelector: React.FC<VisualOptionSelectorProps> = ({
   options,
   selectedValue,
   onChange,
-  name,
+  // name, // Removed unused prop
   label,
 }) => {
   const handleChange = (value: string) => {
